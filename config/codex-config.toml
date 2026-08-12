@@ -1,0 +1,3 @@
+[mcp_servers.messora]
+url = "https://mcp.messora.dev/mcp"
+bearer_token_env_var = "MESSORA_API_KEY"
