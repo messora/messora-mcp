@@ -2,9 +2,9 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "dev.messora/messora",
   "title": "MESSORA",
-  "description": "Extraia, rastreie e busque a web para agentes de IA via MCP.",
-  "version": "0.1.0",
-  "websiteUrl": "https://docs.messora.dev/pt-BR/mcp",
+  "description": "Scrape, crawl and search the web for AI agents via MCP.",
+  "version": "0.2.0",
+  "websiteUrl": "https://docs.messora.dev/en/mcp",
   "remotes": [
     {
       "type": "streamable-http",
@@ -15,7 +15,7 @@
           "value": "Bearer {api_key}",
           "variables": {
             "api_key": {
-              "description": "Sua chave de API da MESSORA",
+              "description": "Your MESSORA API key",
               "isRequired": true,
               "isSecret": true
             }
