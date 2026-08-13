@@ -90,6 +90,88 @@ examples are in [`examples/`](examples):
 is `SUCCESS`, `FAILURE` or `REVOKED`. The MCP adapter does not poll or
 retry charged operations for you.
 
+## What a real run looks like
+
+Actual responses from `https://mcp.messora.dev/mcp`, captured 2026-08-13 on a
+Free account. Nothing here is mocked or hand-written.
+
+**`get_usage`** — no credit cost, use it to check where you stand:
+
+```json
+{
+  "plan": "free",
+  "monthly_credits": 1000,
+  "credits_used": 10,
+  "remaining_credits": 990,
+  "breakdown": [{ "endpoint": "/crawl", "credits_used": 10 }]
+}
+```
+
+**`scrape_url`** with `formats: ["markdown"]` — the common case, **1 credit**:
+
+```json
+{
+  "success": true,
+  "scrape_status": "success",
+  "markdown": "# Example Domain\n\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\n\n[Learn more](https://iana.org/domains/example)",
+  "credits_used": 1,
+  "remaining_credits": 989,
+  "diagnostics": {
+    "engine": "tls",
+    "latency_ms": 74,
+    "http_status": 200,
+    "pages_fetched": 1,
+    "retry_count": 0,
+    "from_cache": false
+  }
+}
+```
+
+**`scrape_url`** with `formats: ["json"]` + a `json_schema` — structured
+extraction, **10 credits** (it runs an LLM pass, so it is not priced like
+markdown):
+
+```json
+{
+  "success": true,
+  "scrape_status": "success",
+  "credits_used": 10,
+  "remaining_credits": 979,
+  "json": {
+    "title": "Example Domain",
+    "purpose": "This domain is for use in documentation examples without needing permission.",
+    "external_links": null
+  },
+  "diagnostics": { "engine": "tls", "latency_ms": 23, "http_status": 200 }
+}
+```
+
+Note `external_links` came back `null`: it was **not** in the schema's
+`required` list and the page has only one link, so the extractor left it
+empty instead of inventing a value. Put a field in `required` when you need
+the model to commit to it.
+
+Two things worth knowing before you budget:
+
+- `credits_used` and `remaining_credits` come back on **every** charged call
+  — you never have to guess.
+- `diagnostics.engine` tells you which path served the request (`tls` here).
+  Heavier anti-bot targets escalate to a browser engine and take longer.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| `401` on every call | The MCP server only accepts `Authorization: Bearer <key>`. `X-API-Key` works on the REST API but **not** here. |
+| Tools don't show up in the picker | Client wasn't restarted after editing the config, or the config went in the wrong file. Claude Desktop is not the same as Claude Code — see the note above. |
+| `403` with `domain_not_supported_in_beta` | `linkedin.com` and `instagram.com` are refused during the beta. The refusal happens before the fetch, so **no credit is charged**. |
+| `402` | Out of credits. Call `get_usage` to confirm, then top up or wait for the monthly reset. |
+| Crawl/search "hangs" | They're async by design. `start_crawl`/`start_search` return a `job_id` immediately; you must poll `get_job` until `SUCCESS`, `FAILURE` or `REVOKED`. |
+| JSON extraction cost a surprise | `formats: ["json"]` runs an LLM pass and costs more than `markdown`. Check `credits_estimated` in `diagnostics`. |
+
+No universal unblocking is promised. Some targets will fail, and the
+`diagnostics` block tells you what was tried.
+
 ## server.json
 
 [`server.json`](server.json) is the manifest MESSORA publishes to the
@@ -133,6 +215,16 @@ cliente. As ferramentas MESSORA aparecem no seletor de tools.
 **Ferramentas disponíveis:** `scrape_url`, `start_crawl`, `start_search`,
 `get_job`, `get_usage` — parâmetros e exemplos completos em
 [`examples/`](examples).
+
+**Execução real:** a seção [What a real run looks like](#what-a-real-run-looks-like)
+traz respostas capturadas do servidor em 2026-08-13, sem mock. Resumo dos
+custos: `markdown` custa **1 crédito**, extração JSON com schema custa **10**
+(roda LLM). Toda chamada cobrada devolve `credits_used` e `remaining_credits`.
+
+**Problemas comuns:** ver [Troubleshooting](#troubleshooting) — `401` costuma
+ser uso de `X-API-Key` (o MCP só aceita `Authorization: Bearer`), tools que
+não aparecem costumam ser cliente não reiniciado, e crawl/search "travados"
+normalmente são só a natureza assíncrona (precisa fazer polling de `get_job`).
 
 **Licença:** MIT, cobre só o conteúdo deste repositório. A implementação
 hospedada do servidor MESSORA é proprietária e não está incluída.
